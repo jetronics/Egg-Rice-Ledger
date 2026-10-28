@@ -1,0 +1,14 @@
+{
+  "name": "egg-rice-ledger",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/cli": "8.5.3",
+    "@capacitor/core": "8.5.3",
+    "@ebarooni/capacitor-calendar": "8.10.0"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "3.0.5"
+  }
+}

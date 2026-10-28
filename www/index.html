@@ -1,0 +1,745 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Egg &amp; Rice Ledger</title>
+<style>
+@font-face{font-family:'Figtree';src:url('fonts/figtree-latin-wght-normal.woff2') format('woff2');font-weight:300 900;font-display:swap}
+@font-face{font-family:'Bricolage Grotesque';src:url('fonts/bricolage-grotesque-latin-wght-normal.woff2') format('woff2');font-weight:200 800;font-display:swap}
+html{color-scheme:light;-webkit-text-size-adjust:100%}
+:root{padding-top:max(env(safe-area-inset-top,0px),var(--safe-area-inset-top,0px));padding-bottom:max(env(safe-area-inset-bottom,0px),var(--safe-area-inset-bottom,0px))}
+body{margin:0;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+/* Layout: one phone-width column (max 560px). Summary tiles on top, three tabs (To collect / Paid / Customers),
+   a fixed Add sale button at the bottom, and bottom-sheet forms for adding a sale and editing prices. */
+:root{
+  --font-display:'Bricolage Grotesque',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-body:'Figtree',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --bg:#f2f5f1; --surface:#ffffff; --surface-2:#e8eee7; --fg:#15201a; --muted:#566559; --line:#d8dfd7;
+  --accent:#1d6a49; --accent-fg:#ffffff; --accent-soft:#dcefe5;
+  --bad:#a9301a; --bad-bg:#fbe3dd; --warn:#7a5200; --warn-bg:#fbefcf;
+  --dot-egg:#e0a21b; --dot-rice:#4f9a76; --shadow:0 -8px 24px rgba(21,32,26,.08);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e1511; --surface:#16201a; --surface-2:#1e2b23; --fg:#e6efe8; --muted:#9bad9f; --line:#28372e;
+    --accent:#5fc795; --accent-fg:#07140d; --accent-soft:#1b3a2b;
+    --bad:#ff9d89; --bad-bg:#3b1b15; --warn:#f0c25a; --warn-bg:#3a2d0e;
+    --dot-egg:#f0b94a; --dot-rice:#5fc795; --shadow:0 -8px 24px rgba(0,0,0,.4);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e1511; --surface:#16201a; --surface-2:#1e2b23; --fg:#e6efe8; --muted:#9bad9f; --line:#28372e;
+  --accent:#5fc795; --accent-fg:#07140d; --accent-soft:#1b3a2b;
+  --bad:#ff9d89; --bad-bg:#3b1b15; --warn:#f0c25a; --warn-bg:#3a2d0e;
+  --dot-egg:#f0b94a; --dot-rice:#5fc795; --shadow:0 -8px 24px rgba(0,0,0,.4);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{
+  background:var(--bg); color:var(--fg); font-family:var(--font-body); font-size:16px; line-height:1.4;
+  padding-block:16px 132px;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));
+  padding-right:max(16px, env(safe-area-inset-right, 0px));
+}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.wrap{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+.num{font-variant-numeric:tabular-nums}
+
+header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+h1{font-family:var(--font-display);font-size:26px;line-height:1.1;margin:0;font-weight:700;letter-spacing:-.01em;text-wrap:balance}
+.date{color:var(--muted);font-size:14px;margin-top:4px}
+.icon-btn{flex:none;width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center}
+.icon-btn svg{width:22px;height:22px}
+.note{font-size:13px;color:var(--warn);background:var(--warn-bg);padding:8px 12px;border-radius:10px}
+
+.summary{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px;min-width:0}
+.tile.big{grid-column:1 / -1;background:var(--accent);color:var(--accent-fg);border-color:transparent}
+.label{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.tile.big .label{color:inherit;opacity:.85}
+.value{font-family:var(--font-display);font-weight:700;font-size:26px;line-height:1.15;margin-top:4px;overflow-wrap:anywhere}
+.tile.big .value{font-size:42px}
+.hint{font-size:13px;color:var(--muted);margin-top:2px}
+.tile.big .hint{color:inherit;opacity:.85}
+.value.bad{color:var(--bad)}
+
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:var(--surface-2);padding:4px;border-radius:14px}
+.tab{border:0;background:transparent;border-radius:11px;min-height:44px;font-weight:600;color:var(--muted);padding:0 6px}
+.tab[aria-selected="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.badge{display:inline-block;min-width:20px;padding:0 6px;margin-left:4px;border-radius:10px;background:var(--accent);color:var(--accent-fg);font-size:12px;line-height:20px}
+
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.remind{background:var(--warn-bg);border-radius:16px;padding:12px 14px;display:flex;flex-direction:column;gap:12px}
+.remind h2{margin:0;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--warn)}
+.rrow{display:grid;grid-template-columns:1fr auto;gap:2px 12px;align-items:center;color:var(--fg)}
+.rrow .who{grid-column:1}
+.rrow .sub{grid-column:1;color:var(--fg);opacity:.8}
+.rrow .btn{grid-column:2;grid-row:1 / span 2;min-height:44px;padding:0 14px;background:var(--surface)}
+.rmsg{grid-column:1 / -1;width:100%;min-height:110px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:10px;font-size:15px;font-family:inherit}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:20px;min-height:40px;padding:0 16px;font-weight:500}
+.chip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:700}
+
+.list{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.row{display:grid;grid-template-columns:44px 1fr;gap:4px 12px;padding:10px 12px;border-top:1px solid var(--line);align-items:start}
+.row:first-child{border-top:0}
+.chk{width:44px;height:44px;border-radius:50%;border:2px solid var(--line);background:var(--surface);display:grid;place-items:center;color:transparent;padding:0}
+.chk svg{width:22px;height:22px}
+.chk.on{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.main{display:grid;grid-template-columns:1fr auto;gap:2px 12px;text-align:left;background:transparent;border:0;padding:2px 0;min-width:0;align-items:center}
+.who{font-weight:700;overflow-wrap:anywhere}
+.amt{font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
+.sub{font-size:13px;color:var(--muted);min-width:0}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:baseline}
+.dot.eggs{background:var(--dot-egg)}.dot.rice{background:var(--dot-rice)}
+.pill{justify-self:end;font-size:12px;font-weight:700;padding:2px 9px;border-radius:10px;white-space:nowrap;background:var(--surface-2);color:var(--muted)}
+.pill.bad{background:var(--bad-bg);color:var(--bad)}
+.pill.warn{background:var(--warn-bg);color:var(--warn)}
+.pill.ok{background:var(--accent-soft);color:var(--accent)}
+.detail{grid-column:2;display:flex;flex-direction:column;gap:10px;padding:4px 0 6px}
+.facts{font-size:14px;color:var(--muted);display:flex;flex-direction:column;gap:2px}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn{min-height:44px;padding:0 18px;border-radius:12px;border:1px solid var(--line);background:var(--surface);font-weight:600}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
+.btn.danger.armed{background:var(--bad);color:var(--surface);border-color:var(--bad)}
+.empty{padding:28px 20px;text-align:center;color:var(--muted)}
+.empty strong{display:block;color:var(--fg);font-size:17px;margin-bottom:4px}
+
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--bg);border-top:1px solid var(--line);box-shadow:var(--shadow);
+  padding-top:12px;padding-bottom:calc(12px + env(safe-area-inset-bottom, 0px));
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
+.bar .btn{display:block;width:100%;max-width:560px;margin:0 auto;min-height:56px;font-size:18px;border-radius:16px}
+.toast{position:fixed;z-index:40;left:50%;transform:translateX(-50%);bottom:calc(92px + env(safe-area-inset-bottom, 0px));
+  width:calc(100% - 32px);max-width:420px;background:var(--fg);color:var(--bg);border-radius:14px;padding:10px 12px 10px 16px;
+  display:flex;align-items:center;gap:12px;justify-content:space-between;font-weight:500}
+.toast button{border:0;background:transparent;color:inherit;font-weight:700;text-decoration:underline;min-height:40px;padding:0 8px}
+.toast{flex-wrap:wrap}
+.toast a{color:inherit;font-weight:700;text-decoration:underline;min-height:40px;display:inline-flex;align-items:center;padding:0 8px}
+a.btn{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;color:var(--fg)}
+
+.sheet{position:fixed;inset:0;z-index:30;display:flex;align-items:flex-end;justify-content:center}
+.backdrop{position:absolute;inset:0;background:rgba(0,0,0,.5)}
+.panel{position:relative;width:100%;max-width:560px;max-height:94dvh;overflow:auto;background:var(--surface);color:var(--fg);
+  border-radius:22px 22px 0 0;padding-top:18px;padding-bottom:calc(20px + env(safe-area-inset-bottom, 0px));
+  padding-left:max(18px, env(safe-area-inset-left, 0px));padding-right:max(18px, env(safe-area-inset-right, 0px));
+  display:flex;flex-direction:column;gap:14px}
+.panel h2{font-family:var(--font-display);font-size:22px;margin:0}
+.panel-head{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.field{display:flex;flex-direction:column;gap:6px}
+.field>span,.fieldlabel{font-size:13px;font-weight:600;color:var(--muted)}
+input[type=text],input[type=number],input[type=date]{width:100%;min-height:48px;border-radius:12px;border:1px solid var(--line);background:var(--bg);padding:0 12px;font-size:16px}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.seg button{min-height:52px;border-radius:12px;border:2px solid var(--line);background:var(--bg);font-weight:700;font-size:17px}
+.seg button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.terms{font-size:13px;color:var(--muted)}
+.qrow{display:flex;flex-direction:column;gap:8px;padding:10px 0;border-top:1px solid var(--line)}
+.qname{font-weight:700;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px}
+.qname small{font-weight:400;color:var(--muted);font-size:13px}
+.stepper{display:grid;grid-template-columns:52px 1fr 52px;gap:8px;align-items:center}
+.stepper button{height:48px;border-radius:12px;border:1px solid var(--line);background:var(--bg);font-size:24px;font-weight:600;padding:0}
+.stepper input{text-align:center;font-weight:700;font-size:20px}
+.preview{background:var(--accent-soft);border-radius:14px;padding:12px 14px;display:grid;grid-template-columns:1fr auto;gap:4px 12px;font-size:15px}
+.preview b{font-variant-numeric:tabular-nums;text-align:right}
+.preview .total{font-size:18px}
+.err{color:var(--bad);font-size:14px;min-height:20px}
+.cfg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.cfg h3{grid-column:1 / -1;margin:6px 0 0;font-size:16px}
+@media (prefers-reduced-motion: no-preference){
+  .panel{animation:rise .2s ease-out}
+  @keyframes rise{from{transform:translateY(24px);opacity:.6}to{transform:none;opacity:1}}
+}
+@media (max-width:380px){
+  .tile.big .value{font-size:36px}
+  .value{font-size:22px}
+}
+</style>
+
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Egg &amp; Rice Ledger</h1>
+      <div class="date" id="todayLabel"></div>
+    </div>
+    <button class="icon-btn" id="openCfg" type="button" aria-label="Prices and payment terms">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
+    </button>
+  </header>
+
+  <section class="summary" aria-label="Summary">
+    <div class="tile big"><div class="label">To collect</div><div class="value num" id="sCollect">₱0</div><div class="hint" id="sCollectHint">No unpaid sales</div></div>
+    <div class="tile"><div class="label">Overdue</div><div class="value num" id="sOver">₱0</div><div class="hint" id="sOverHint">Nothing late</div></div>
+    <div class="tile"><div class="label">Profit this month</div><div class="value num" id="sProfit">₱0</div><div class="hint" id="sProfitHint">₱0 collected</div></div>
+  </section>
+
+  <section class="remind" id="remind" aria-label="Reminders" hidden></section>
+
+  <div class="tabs" role="tablist" aria-label="Views">
+    <button class="tab" role="tab" id="tab-collect" data-tab="collect" type="button">To collect<span class="badge num" id="collectCount" hidden>0</span></button>
+    <button class="tab" role="tab" id="tab-paid" data-tab="paid" type="button">Paid</button>
+    <button class="tab" role="tab" id="tab-customers" data-tab="customers" type="button">Customers</button>
+  </div>
+  <div class="chips" id="chips">
+    <button class="chip" type="button" data-f="all">All</button>
+    <button class="chip" type="button" data-f="eggs">Eggs</button>
+    <button class="chip" type="button" data-f="rice">Rice</button>
+  </div>
+  <ul class="list" id="list" role="tabpanel"></ul>
+</div>
+
+<div class="bar"><button class="btn primary" id="openAdd" type="button">+ Add sale</button></div>
+<div class="toast" id="toast" role="status" hidden></div>
+<datalist id="custlist"></datalist>
+
+<div class="sheet" id="addSheet" hidden>
+  <div class="backdrop" data-close="addSheet"></div>
+  <form class="panel" id="addForm" role="dialog" aria-modal="true" aria-labelledby="addTitle" novalidate>
+    <div class="panel-head"><h2 id="addTitle">New sale</h2><button class="icon-btn" type="button" data-close="addSheet" aria-label="Close">✕</button></div>
+    <label class="field"><span>Customer</span><input type="text" id="fCust" list="custlist" autocomplete="off" autocapitalize="words" placeholder="Who bought?"></label>
+    <label class="field"><span>Sale date</span><input type="date" id="fDate"></label>
+    <div class="field"><span class="fieldlabel">What did they get? Leave a product at 0 to skip it.</span>
+      <div class="qrow">
+        <div class="qname"><span class="dot eggs"></span>Eggs (trays)<small id="terms-eggs"></small></div>
+        <div class="stepper">
+          <button type="button" class="qstep" data-p="eggs" data-d="-1" aria-label="One less tray">−</button>
+          <input type="number" class="qin" id="qty-eggs" inputmode="decimal" min="0" step="any" value="0" aria-label="Trays of eggs">
+          <button type="button" class="qstep" data-p="eggs" data-d="1" aria-label="One more tray">+</button>
+        </div>
+      </div>
+      <div class="qrow">
+        <div class="qname"><span class="dot rice"></span>Rice (sacks)<small id="terms-rice"></small></div>
+        <div class="stepper">
+          <button type="button" class="qstep" data-p="rice" data-d="-1" aria-label="One less sack">−</button>
+          <input type="number" class="qin" id="qty-rice" inputmode="decimal" min="0" step="any" value="0" aria-label="Sacks of rice">
+          <button type="button" class="qstep" data-p="rice" data-d="1" aria-label="One more sack">+</button>
+        </div>
+      </div>
+    </div>
+    <div class="preview num" aria-live="polite">
+      <span>Total</span><b class="total" id="pTotal">₱0</b>
+      <span>Your profit</span><b id="pProfit">₱0</b>
+      <span id="pL-eggs" hidden>Eggs due</span><b id="pV-eggs" hidden>-</b>
+      <span id="pL-rice" hidden>Rice due</span><b id="pV-rice" hidden>-</b>
+    </div>
+    <div class="err" id="fErr" role="alert"></div>
+    <button class="btn primary" type="submit" style="min-height:54px;font-size:17px">Save sale</button>
+  </form>
+</div>
+
+<div class="sheet" id="editSheet" hidden>
+  <div class="backdrop" data-close="editSheet"></div>
+  <form class="panel" id="editForm" role="dialog" aria-modal="true" aria-labelledby="editTitle" novalidate>
+    <div class="panel-head"><h2 id="editTitle">Edit sale</h2><button class="icon-btn" type="button" data-close="editSheet" aria-label="Close">✕</button></div>
+    <label class="field"><span>Customer</span><input type="text" id="eCust" list="custlist" autocomplete="off" autocapitalize="words"></label>
+    <div class="field"><span class="fieldlabel">Product</span>
+      <div class="seg" id="eProd">
+        <button type="button" data-p="eggs" aria-pressed="true">Eggs</button>
+        <button type="button" data-p="rice" aria-pressed="false">Rice</button>
+      </div>
+    </div>
+    <label class="field"><span id="eQtyLabel">Quantity</span><input type="number" id="eQty" inputmode="decimal" min="0" step="any"></label>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <label class="field"><span>Sell price each</span><input type="number" id="ePrice" inputmode="decimal" min="0" step="any"></label>
+      <label class="field"><span>Your cost each</span><input type="number" id="eCost" inputmode="decimal" min="0" step="any"></label>
+    </div>
+    <label class="field"><span>Sale date</span><input type="date" id="eDate"></label>
+    <label class="field"><span>Payment due</span><input type="date" id="eDue"></label>
+    <label class="field" id="ePaidWrap" hidden><span>Paid on</span><input type="date" id="ePaid"></label>
+    <div class="preview num" aria-live="polite">
+      <span>Total</span><b class="total" id="eTotal">₱0</b>
+      <span>Your profit</span><b id="eProfit">₱0</b>
+    </div>
+    <div class="err" id="eErr" role="alert"></div>
+    <button class="btn primary" type="submit" style="min-height:54px;font-size:17px">Save changes</button>
+  </form>
+</div>
+
+<div class="sheet" id="cfgSheet" hidden>
+  <div class="backdrop" data-close="cfgSheet"></div>
+  <form class="panel" id="cfgForm" role="dialog" aria-modal="true" aria-labelledby="cfgTitle" novalidate>
+    <div class="panel-head"><h2 id="cfgTitle">Prices and terms</h2><button class="icon-btn" type="button" data-close="cfgSheet" aria-label="Close">✕</button></div>
+    <div class="cfg" id="cfgFields"></div>
+    <div class="terms">New prices apply to new sales. Past sales keep the price they were sold at.</div>
+    <div class="field" style="border-top:1px solid var(--line);padding-top:12px">
+      <span class="fieldlabel">Backup</span>
+      <div class="terms">Your sales are stored on this phone. Copy a backup now and then and paste it into Notes or a chat with yourself.</div>
+      <div class="actions">
+        <button class="btn" type="button" id="bkCopy">Copy backup</button>
+        <button class="btn" type="button" id="bkShow">Restore a backup</button>
+      </div>
+      <textarea class="rmsg" id="bkText" hidden placeholder="Paste your backup here" aria-label="Backup text"></textarea>
+      <button class="btn danger" type="button" id="bkRestore" hidden>Restore from pasted backup</button>
+    </div>
+    <div class="err" id="cErr" role="alert"></div>
+    <button class="btn primary" type="submit" style="min-height:54px;font-size:17px">Save prices</button>
+  </form>
+</div>
+
+<script>
+(function(){
+'use strict';
+var DEFAULTS={
+  eggs:{label:'Eggs',unit:'tray',price:240,cost:190,days:7},
+  rice:{label:'Rice',unit:'sack',price:1600,cost:1200,days:14}
+};
+var LS_KEY='egg-rice-ledger-v1';
+var state={sales:[],config:clone(DEFAULTS),tab:'collect',filter:'all',open:null,armed:null,mode:'loading',product:'eggs'};
+var backend=null, toastTimer=null, lastFocus=null;
+
+function $(id){return document.getElementById(id)}
+function clone(o){return JSON.parse(JSON.stringify(o))}
+function pad(n){return n<10?'0'+n:''+n}
+function ymd(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
+function parse(s){var p=s.split('-');return new Date(+p[0],+p[1]-1,+p[2],12)}
+function today(){return ymd(new Date())}
+function addDays(s,n){var d=parse(s);d.setDate(d.getDate()+n);return ymd(d)}
+function diffDays(a,b){return Math.round((parse(a)-parse(b))/86400000)}
+function fmtDate(s){
+  var d=parse(s), o={month:'short',day:'numeric'};
+  if(d.getFullYear()!==new Date().getFullYear())o.year='numeric';
+  return d.toLocaleDateString('en-PH',o);
+}
+function peso(n){return '₱'+(Math.round(n*100)/100).toLocaleString('en-PH')}
+function total(s){return s.qty*s.price}
+function profit(s){return s.qty*(s.price-s.cost)}
+function plural(n,w){return (n===1?w:w+'s')}
+function qtyText(n){return (Math.round(n*100)/100).toString()}
+function newId(){return 's'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
+function mergeConfig(c){
+  var out=clone(DEFAULTS);
+  ['eggs','rice'].forEach(function(k){
+    if(c&&c[k]){['price','cost','days'].forEach(function(f){var v=Number(c[k][f]);if(isFinite(v)&&v>=0)out[k][f]=v})}
+  });
+  return out;
+}
+function el(tag,props,kids){
+  var n=document.createElement(tag);
+  if(props){for(var k in props){var v=props[k];
+    if(k==='class')n.className=v;
+    else if(k==='text')n.textContent=v;
+    else if(k.slice(0,2)==='on')n.addEventListener(k.slice(2),v);
+    else if(v!==false&&v!=null)n.setAttribute(k,v===true?'':v);
+  }}
+  (kids||[]).forEach(function(c){if(c==null||c===false)return;n.appendChild(typeof c==='string'?document.createTextNode(c):c)});
+  return n;
+}
+
+/* ---------- storage ---------- */
+function lsLoad(){
+  try{var r=localStorage.getItem(LS_KEY);if(r){var o=JSON.parse(r);state.sales=o.sales||[];if(o.config)state.config=mergeConfig(o.config)}}catch(e){}
+}
+function lsSave(){try{localStorage.setItem(LS_KEY,JSON.stringify({sales:state.sales,config:state.config}))}catch(e){}}
+function useLocal(){backend=null;state.mode='local';lsLoad();render()}
+function fail(){toast('Could not save. Please try again.')}
+
+async function addSale(s){
+  if(backend){var b=Object.assign({},s);delete b.id;await backend.collection('sales').doc(s.id).set(b)}
+  else{state.sales.push(s);lsSave();render()}
+}
+async function setPaid(id,paidOn){
+  try{
+    if(backend){await backend.collection('sales').doc(id).update({paidOn:paidOn})}
+    else{state.sales.forEach(function(s){if(s.id===id)s.paidOn=paidOn});lsSave();render()}
+  }catch(e){fail()}
+}
+async function removeSale(id){
+  try{
+    if(backend){await backend.collection('sales').doc(id).delete()}
+    else{state.sales=state.sales.filter(function(s){return s.id!==id});lsSave();render()}
+  }catch(e){fail()}
+}
+async function saveConfig(cfg){
+  if(backend){await backend.doc('config/prices').set(cfg)}
+  else{state.config=cfg;lsSave();render()}
+}
+
+/* ---------- derived ---------- */
+function status(s){
+  if(s.paidOn)return{cls:'ok',text:'Paid '+fmtDate(s.paidOn)};
+  var d=diffDays(s.due,today());
+  if(d<0)return{cls:'bad',text:'Overdue '+(-d)+' '+plural(-d,'day')};
+  if(d===0)return{cls:'warn',text:'Due today'};
+  if(d<=2)return{cls:'warn',text:'Due in '+d+' '+plural(d,'day')};
+  return{cls:'',text:'Due '+fmtDate(s.due)};
+}
+function customers(){
+  var map={};
+  state.sales.forEach(function(s){
+    var key=s.customer.trim().toLowerCase();
+    var c=map[key]||(map[key]={name:s.customer.trim(),unpaid:[],balance:0,profit:0,last:''});
+    if(!s.paidOn){c.unpaid.push(s);c.balance+=total(s)}
+    c.profit+=profit(s);
+    if(s.date>c.last)c.last=s.date;
+  });
+  return Object.keys(map).map(function(k){return map[k]}).sort(function(a,b){return b.balance-a.balance||a.name.localeCompare(b.name)});
+}
+
+/* ---------- render ---------- */
+function render(){renderSummary();renderReminders();renderTabs();renderList();renderDatalist()}
+
+function reminderText(c){
+  var t=today();
+  var lines=c.items.map(function(s){
+    return qtyText(s.qty)+' '+plural(s.qty,DEFAULTS[s.product].unit)+' of '+s.product+' ('+(s.due<t?'was due ':'due ')+fmtDate(s.due)+')';
+  });
+  return 'Hi '+c.name+', a friendly reminder about your unpaid balance of '+peso(c.balance)+': '+lines.join(', ')+'. Please let me know when you can pay. Thank you!';
+}
+function copyReminder(c){
+  var txt=reminderText(c);
+  var fallback=function(){state.msgFor=c.key;renderReminders();var ta=document.querySelector('.rmsg');if(ta){ta.focus();ta.select()}};
+  try{
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      navigator.clipboard.writeText(txt).then(function(){toast('Message copied. Paste it in Messenger or SMS.')},fallback);
+    }else fallback();
+  }catch(e){fallback()}
+}
+function renderReminders(){
+  var box=$('remind'), t=today(), lim=addDays(t,1), map={};
+  state.sales.forEach(function(s){
+    if(s.paidOn||s.due>lim)return;
+    var k=s.customer.trim().toLowerCase();
+    var c=map[k]||(map[k]={key:k,name:s.customer.trim(),items:[],balance:0,first:s.due});
+    c.items.push(s);c.balance+=total(s);if(s.due<c.first)c.first=s.due;
+  });
+  var list=Object.keys(map).map(function(k){return map[k]}).sort(function(a,b){return a.first.localeCompare(b.first)});
+  box.textContent='';box.hidden=!list.length;
+  if(!list.length)return;
+  box.appendChild(el('h2',{text:'Remind today'}));
+  list.forEach(function(c){
+    var d=diffDays(c.first,t);
+    var when=d<0?'Overdue '+(-d)+' '+plural(-d,'day'):(d===0?'Due today':'Due tomorrow');
+    var n=c.items.length;
+    var row=el('div',{class:'rrow'},[
+      el('span',{class:'who',text:c.name+' · '+peso(c.balance)}),
+      el('span',{class:'sub',text:when+' · '+n+' '+plural(n,'sale')}),
+      el('button',{class:'btn',type:'button',text:'Copy message',onclick:function(){copyReminder(c)}})
+    ]);
+    if(state.msgFor===c.key)row.appendChild(el('textarea',{class:'rmsg',readonly:true,'aria-label':'Reminder message for '+c.name,text:reminderText(c)}));
+    box.appendChild(row);
+  });
+}
+
+function renderSummary(){
+  var t=today(), month=t.slice(0,7);
+  var unpaid=state.sales.filter(function(s){return !s.paidOn});
+  var sum=function(a,f){return a.reduce(function(x,s){return x+f(s)},0)};
+  var over=unpaid.filter(function(s){return s.due<t});
+  var mSales=state.sales.filter(function(s){return s.date.slice(0,7)===month});
+  $('sCollect').textContent=peso(sum(unpaid,total));
+  $('sCollectHint').textContent=unpaid.length?unpaid.length+' unpaid '+plural(unpaid.length,'sale'):'No unpaid sales';
+  $('sOver').textContent=peso(sum(over,total));
+  $('sOver').className='value num'+(over.length?' bad':'');
+  $('sOverHint').textContent=over.length?over.length+' past due':'Nothing late';
+  $('sProfit').textContent=peso(sum(mSales,profit));
+  $('sProfitHint').textContent=peso(sum(mSales.filter(function(s){return s.paidOn}),profit))+' collected';
+}
+function renderTabs(){
+  document.querySelectorAll('.tab').forEach(function(b){b.setAttribute('aria-selected',b.dataset.tab===state.tab?'true':'false')});
+  document.querySelectorAll('.chip').forEach(function(b){b.setAttribute('aria-pressed',b.dataset.f===state.filter?'true':'false')});
+  $('chips').hidden=state.tab==='customers';
+  var n=state.sales.filter(function(s){return !s.paidOn}).length;
+  $('collectCount').hidden=!n;$('collectCount').textContent=n;
+}
+function renderDatalist(){
+  var dl=$('custlist');dl.textContent='';
+  customers().forEach(function(c){dl.appendChild(el('option',{value:c.name}))});
+}
+function empty(box,title,msg){
+  box.appendChild(el('li',{class:'empty'},[el('strong',{text:title}),msg]));
+}
+function renderList(){
+  var box=$('list');box.textContent='';
+  if(state.mode==='loading'&&!state.sales.length){empty(box,'Loading your ledger','One moment.');return}
+  if(state.tab==='customers'){renderCustomers(box);return}
+  var paid=state.tab==='paid';
+  var rows=state.sales.filter(function(s){return !!s.paidOn===paid&&(state.filter==='all'||s.product===state.filter)});
+  rows.sort(paid
+    ? function(a,b){return b.paidOn.localeCompare(a.paidOn)}
+    : function(a,b){return a.due.localeCompare(b.due)||a.customer.localeCompare(b.customer)});
+  if(!rows.length){
+    if(paid)empty(box,'No payments recorded','Paid sales show up here.');
+    else empty(box,'Nothing to collect','Tap Add sale to log eggs or rice sold on credit.');
+    return;
+  }
+  rows.forEach(function(s){box.appendChild(saleRow(s))});
+}
+var CHECK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+function saleRow(s){
+  var st=status(s), p=state.config[s.product]||DEFAULTS[s.product], open=state.open===s.id, unit=(DEFAULTS[s.product]||{}).unit||'unit';
+  var li=el('li',{class:'row'});
+  var chk=el('button',{class:'chk'+(s.paidOn?' on':''),type:'button','aria-label':(s.paidOn?'Mark unpaid: ':'Mark paid: ')+s.customer,onclick:function(){togglePaid(s)}});
+  chk.innerHTML=CHECK;
+  var sub=el('span',{class:'sub'},[el('span',{class:'dot '+s.product}),DEFAULTS[s.product].label+' · '+qtyText(s.qty)+' '+plural(s.qty,unit)+' × '+peso(s.price)]);
+  var main=el('button',{class:'main',type:'button','aria-expanded':open?'true':'false',onclick:function(){state.open=open?null:s.id;state.armed=null;renderList()}},[
+    el('span',{class:'who',text:s.customer}),
+    el('span',{class:'amt',text:peso(total(s))}),
+    sub,
+    el('span',{class:'pill '+st.cls,text:st.text})
+  ]);
+  li.appendChild(chk);li.appendChild(main);
+  if(open){
+    var armed=state.armed===s.id;
+    li.appendChild(el('div',{class:'detail'},[
+      el('div',{class:'facts'},[
+        el('span',{text:'Sold '+fmtDate(s.date)+' · due '+fmtDate(s.due)}),
+        el('span',{text:'Profit '+peso(profit(s))+' ('+peso(s.price-s.cost)+' per '+unit+')'})
+      ]),
+      el('div',{class:'actions'},[
+        !s.paidOn&&el('button',{class:'btn primary',type:'button',text:'Add to calendar',onclick:function(){addToCalendar(s)}}),
+        el('button',{class:'btn',type:'button',text:'Edit',onclick:function(){openEdit(s)}}),
+        el('button',{class:'btn danger'+(armed?' armed':''),type:'button',text:armed?'Tap again to delete':'Delete sale',onclick:function(){
+          if(armed){state.open=null;state.armed=null;removeSale(s.id)}else{state.armed=s.id;renderList()}
+        }})
+      ])
+    ]));
+  }
+  return li;
+}
+function renderCustomers(box){
+  var cs=customers();
+  if(!cs.length){empty(box,'No customers yet','Customers appear after your first sale.');return}
+  cs.forEach(function(c){
+    var key=c.name.toLowerCase(), open=state.open==='c:'+key, armed=state.armed==='c:'+key;
+    var li=el('li',{class:'row',style:'grid-template-columns:1fr'});
+    var main=el('button',{class:'main',type:'button','aria-expanded':open?'true':'false',onclick:function(){state.open=open?null:'c:'+key;state.armed=null;renderList()}},[
+      el('span',{class:'who',text:c.name}),
+      el('span',{class:'amt',text:c.balance?peso(c.balance):'Settled'}),
+      el('span',{class:'sub',text:c.unpaid.length?c.unpaid.length+' unpaid '+plural(c.unpaid.length,'sale'):'Last sale '+fmtDate(c.last)}),
+      el('span',{class:'pill '+(c.balance?'':'ok'),text:c.balance?'Owes':'All paid'})
+    ]);
+    li.appendChild(main);
+    if(open){
+      var acts=[el('button',{class:'btn primary',type:'button',text:'Add sale',onclick:function(){openAdd(c.name)}})];
+      if(c.unpaid.length)acts.push(el('button',{class:'btn danger'+(armed?' armed':''),type:'button',text:armed?'Tap again to confirm':'Mark all paid',onclick:function(){
+        if(armed){state.armed=null;collectAll(c)}else{state.armed='c:'+key;renderList()}
+      }}));
+      li.appendChild(el('div',{class:'detail',style:'grid-column:1'},[
+        el('div',{class:'facts'},[el('span',{text:'Profit from all sales: '+peso(c.profit)}),el('span',{text:'Last sale '+fmtDate(c.last)})]),
+        el('div',{class:'actions'},acts)
+      ]));
+    }
+    box.appendChild(li);
+  });
+}
+
+/* ---------- actions ---------- */
+function togglePaid(s){
+  if(s.paidOn){setPaid(s.id,null);toast('Moved back to unpaid')}
+  else{setPaid(s.id,today());toast(s.customer+' paid '+peso(total(s)),'Undo',function(){setPaid(s.id,null)})}
+}
+async function collectAll(c){
+  var ids=c.unpaid.map(function(s){return s.id}), t=today();
+  await Promise.all(ids.map(function(id){return setPaid(id,t)}));
+  toast(c.name+' paid '+peso(c.balance),'Undo',function(){ids.forEach(function(id){setPaid(id,null)})});
+}
+function toast(msg,label,fn){
+  var t=$('toast');t.textContent='';t.hidden=false;
+  t.appendChild(el('span',{text:msg}));
+  if(label)t.appendChild(el('button',{type:'button',text:label,onclick:function(){t.hidden=true;fn()}}));
+  clearTimeout(toastTimer);toastTimer=setTimeout(function(){t.hidden=true},label?6000:3500);
+}
+
+function calLink(s){
+  var d=s.due.replace(/-/g,''), tz='';
+  try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||''}catch(e){}
+  var title='Collect '+peso(total(s))+' from '+s.customer;
+  var det=qtyText(s.qty)+' '+plural(s.qty,DEFAULTS[s.product].unit)+' of '+s.product+', sold '+fmtDate(s.date)+'. Mark it paid in Egg & Rice Ledger.';
+  var u='https://calendar.google.com/calendar/render?action=TEMPLATE&text='+encodeURIComponent(title)+
+    '&dates='+d+'T090000/'+d+'T091500&details='+encodeURIComponent(det);
+  if(tz)u+='&ctz='+encodeURIComponent(tz);
+  return u;
+}
+function addToCalendar(s){
+  var P=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.CapacitorCalendar;
+  var start=parse(s.due);start.setHours(9,0,0,0);
+  var end=new Date(start.getTime()+15*60000);
+  if(P&&P.createEventWithPrompt){
+    P.createEventWithPrompt({
+      title:'Collect '+peso(total(s))+' from '+s.customer,
+      description:qtyText(s.qty)+' '+plural(s.qty,DEFAULTS[s.product].unit)+' of '+s.product+', sold '+fmtDate(s.date)+'.',
+      startDate:start.getTime(),endDate:end.getTime(),alerts:[-1440,0]
+    }).catch(function(){toast('Could not open your calendar app.')});
+  }else{window.open(calLink(s),'_blank')}
+}
+function toastCal(msg,sales){
+  var t=$('toast');t.textContent='';t.hidden=false;
+  t.appendChild(el('span',{text:msg}));
+  sales.forEach(function(s){
+    t.appendChild(el('button',{type:'button',text:sales.length>1?DEFAULTS[s.product].label+' to calendar':'Add to calendar',onclick:function(){addToCalendar(s)}}));
+  });
+  clearTimeout(toastTimer);toastTimer=setTimeout(function(){t.hidden=true},12000);
+}
+
+/* ---------- edit a sale ---------- */
+var editing=null, editProduct='eggs', editPrevDate='';
+async function updateSale(id,fields){
+  if(backend){await backend.collection('sales').doc(id).update(fields)}
+  else{state.sales.forEach(function(s){if(s.id===id)Object.assign(s,fields)});lsSave();render()}
+}
+function setEditProduct(p,reset){
+  editProduct=p;
+  document.querySelectorAll('#eProd button').forEach(function(b){b.setAttribute('aria-pressed',b.dataset.p===p?'true':'false')});
+  $('eQtyLabel').textContent='Quantity ('+plural(2,DEFAULTS[p].unit)+')';
+  if(reset){
+    var c=state.config[p];
+    $('ePrice').value=c.price;$('eCost').value=c.cost;
+    $('eDue').value=addDays($('eDate').value||today(),c.days);
+  }
+  updateEditPreview();
+}
+function updateEditPreview(){
+  var q=parseFloat($('eQty').value), pr=parseFloat($('ePrice').value), co=parseFloat($('eCost').value);
+  if(!(q>0))q=0;if(!(pr>=0))pr=0;if(!(co>=0))co=0;
+  $('eTotal').textContent=peso(q*pr);$('eProfit').textContent=peso(q*(pr-co));
+}
+function openEdit(s){
+  editing=s;
+  $('eCust').value=s.customer;$('eQty').value=qtyText(s.qty);
+  $('ePrice').value=s.price;$('eCost').value=s.cost;
+  $('eDate').value=s.date;$('eDue').value=s.due;editPrevDate=s.date;
+  $('ePaid').value=s.paidOn||'';$('ePaidWrap').hidden=!s.paidOn;
+  $('eErr').textContent='';
+  setEditProduct(s.product,false);
+  openSheet('editSheet');
+}
+
+/* ---------- sheets ---------- */
+function openSheet(id){
+  lastFocus=document.activeElement;
+  $(id).hidden=false;document.body.style.overflow='hidden';
+}
+function closeSheet(id){
+  $(id).hidden=true;document.body.style.overflow='';
+  if(lastFocus&&lastFocus.focus)lastFocus.focus();
+}
+function qtyOf(p){var q=parseFloat($('qty-'+p).value);return q>0?q:0}
+function updatePreview(){
+  var d=$('fDate').value||today(), t=0, pr=0;
+  ['eggs','rice'].forEach(function(p){
+    var c=state.config[p], q=qtyOf(p);
+    t+=q*c.price;pr+=q*(c.price-c.cost);
+    $('terms-'+p).textContent=peso(c.price)+' each · pays in '+c.days+' days';
+    $('pL-'+p).hidden=!q;$('pV-'+p).hidden=!q;
+    $('pV-'+p).textContent=fmtDate(addDays(d,c.days));
+  });
+  $('pTotal').textContent=peso(t);$('pProfit').textContent=peso(pr);
+}
+function openAdd(name){
+  $('fCust').value=name||'';$('qty-eggs').value='0';$('qty-rice').value='0';$('fDate').value=today();$('fErr').textContent='';
+  updatePreview();openSheet('addSheet');
+  setTimeout(function(){$(name?'qty-eggs':'fCust').focus()},50);
+}
+function openCfg(){
+  var box=$('cfgFields');box.textContent='';
+  ['eggs','rice'].forEach(function(k){
+    var c=state.config[k];
+    box.appendChild(el('h3',{text:DEFAULTS[k].label+' (per '+DEFAULTS[k].unit+')'}));
+    [['price','Sell price'],['cost','Your cost'],['days','Pays in days']].forEach(function(f){
+      var id='c-'+k+'-'+f[0];
+      box.appendChild(el('label',{class:'field'},[el('span',{text:f[1]}),el('input',{type:'number',id:id,inputmode:'decimal',min:'0',step:'any',value:c[f[0]]})]));
+    });
+  });
+  $('cErr').textContent='';
+  openSheet('cfgSheet');
+}
+
+/* ---------- wiring ---------- */
+document.querySelectorAll('.tab').forEach(function(b){b.addEventListener('click',function(){state.tab=b.dataset.tab;state.open=null;state.armed=null;render()})});
+document.querySelectorAll('.chip').forEach(function(b){b.addEventListener('click',function(){state.filter=b.dataset.f;state.open=null;state.armed=null;render()})});
+document.querySelectorAll('[data-close]').forEach(function(b){b.addEventListener('click',function(){closeSheet(b.dataset.close)})});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){['addSheet','cfgSheet','editSheet'].forEach(function(id){if(!$(id).hidden)closeSheet(id)})}});
+$('openAdd').addEventListener('click',function(){openAdd('')});
+$('openCfg').addEventListener('click',function(){$('bkText').hidden=true;$('bkRestore').hidden=true;$('bkText').value='';openCfg()});
+function backupJson(){return JSON.stringify({app:'egg-rice-ledger',version:1,savedAt:new Date().toISOString(),sales:state.sales,config:state.config})}
+$('bkCopy').addEventListener('click',function(){
+  var txt=backupJson();
+  var done=function(){toast('Backup copied. Paste it somewhere safe.')};
+  var manual=function(){$('bkText').hidden=false;$('bkText').value=txt;$('bkText').focus();$('bkText').select();$('bkRestore').hidden=true;toast('Select all and copy the text below.')};
+  try{if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt).then(done,manual);else manual()}catch(e){manual()}
+});
+$('bkShow').addEventListener('click',function(){$('bkText').hidden=false;$('bkText').value='';$('bkRestore').hidden=false;$('bkRestore').textContent='Restore from pasted backup';$('bkText').focus()});
+var bkArmed=false;
+$('bkRestore').addEventListener('click',function(){
+  var o;
+  try{o=JSON.parse($('bkText').value.trim())}catch(e){o=null}
+  if(!o||!Array.isArray(o.sales)){$('cErr').textContent='That is not a valid backup.';return}
+  if(!bkArmed){bkArmed=true;$('bkRestore').textContent='Tap again to replace current data';setTimeout(function(){bkArmed=false},5000);return}
+  bkArmed=false;
+  state.sales=o.sales.filter(function(x){return x&&x.id&&x.customer&&x.product&&x.date&&x.due});
+  state.config=mergeConfig(o.config);lsSave();render();
+  closeSheet('cfgSheet');toast('Restored '+state.sales.length+' '+plural(state.sales.length,'sale'));
+});
+document.querySelectorAll('#eProd button').forEach(function(b){b.addEventListener('click',function(){setEditProduct(b.dataset.p,b.dataset.p!==editProduct)})});
+['eQty','ePrice','eCost'].forEach(function(id){$(id).addEventListener('input',updateEditPreview)});
+$('eDate').addEventListener('input',function(){
+  var nd=$('eDate').value, due=$('eDue').value;
+  if(nd&&editPrevDate&&due){$('eDue').value=addDays(due,diffDays(nd,editPrevDate))}
+  if(nd)editPrevDate=nd;
+});
+$('editForm').addEventListener('submit',async function(e){
+  e.preventDefault();
+  if(!editing)return;
+  var name=$('eCust').value.trim(), q=parseFloat($('eQty').value), pr=parseFloat($('ePrice').value), co=parseFloat($('eCost').value);
+  var d=$('eDate').value, due=$('eDue').value, paid=$('ePaid').value;
+  if(!name){$('eErr').textContent='Enter the customer name.';$('eCust').focus();return}
+  if(!(q>0)){$('eErr').textContent='Quantity must be more than zero.';$('eQty').focus();return}
+  if(!(pr>=0)||!(co>=0)){$('eErr').textContent='Enter the price and cost.';return}
+  if(!d||!due){$('eErr').textContent='Pick the sale date and the payment due date.';return}
+  var fields={customer:name,product:editProduct,qty:q,price:pr,cost:co,date:d,due:due};
+  if(editing.paidOn)fields.paidOn=paid||editing.paidOn;
+  try{
+    await updateSale(editing.id,fields);
+    closeSheet('editSheet');editing=null;toast('Sale updated');
+  }catch(err){$('eErr').textContent='Could not save. Please try again.'}
+});
+document.querySelectorAll('.qstep').forEach(function(b){b.addEventListener('click',function(){var i=$('qty-'+b.dataset.p);i.value=qtyText(Math.max(0,(parseFloat(i.value)||0)+Number(b.dataset.d)));updatePreview()})});
+document.querySelectorAll('.qin').forEach(function(i){i.addEventListener('input',updatePreview)});
+$('fDate').addEventListener('input',updatePreview);
+
+$('addForm').addEventListener('submit',async function(e){
+  e.preventDefault();
+  var name=$('fCust').value.trim(), d=$('fDate').value;
+  if(!name){$('fErr').textContent='Enter the customer name.';$('fCust').focus();return}
+  if(!d){$('fErr').textContent='Pick the sale date.';return}
+  var items=['eggs','rice'].filter(function(p){return qtyOf(p)>0});
+  if(!items.length){$('fErr').textContent='Enter trays of eggs or sacks of rice.';$('qty-eggs').focus();return}
+  var made=[];
+  try{
+    for(var i=0;i<items.length;i++){
+      var p=items[i], c=state.config[p];
+      var sale={id:newId(),customer:name,product:p,qty:qtyOf(p),price:c.price,cost:c.cost,date:d,due:addDays(d,c.days),paidOn:null,createdAt:Date.now()};
+      await addSale(sale);made.push(sale);
+    }
+    closeSheet('addSheet');state.tab='collect';state.filter='all';render();
+    toastCal('Added '+items.map(function(p){return qtyText(qtyOf(p))+' '+plural(qtyOf(p),DEFAULTS[p].unit)}).join(' + ')+' for '+name,made);
+  }catch(err){$('fErr').textContent='Could not save. Please try again.'}
+});
+$('cfgForm').addEventListener('submit',async function(e){
+  e.preventDefault();
+  var cfg=clone(DEFAULTS);
+  for(var i=0;i<2;i++){
+    var k=['eggs','rice'][i];
+    for(var j=0;j<3;j++){
+      var f=['price','cost','days'][j], v=parseFloat($('c-'+k+'-'+f).value);
+      if(!(v>=0)){$('cErr').textContent='Enter a number for every field.';return}
+      cfg[k][f]=v;
+    }
+    if(cfg[k].days<1){$('cErr').textContent='Pays in days must be at least 1.';return}
+  }
+  try{await saveConfig(cfg);closeSheet('cfgSheet');toast('Prices saved')}
+  catch(err){$('cErr').textContent='Could not save. Please try again.'}
+});
+
+$('todayLabel').textContent=new Date().toLocaleDateString('en-PH',{weekday:'long',month:'long',day:'numeric'});
+
+function init(){useLocal()}
+init();
+})();
+</script>
+</body>
+</html>

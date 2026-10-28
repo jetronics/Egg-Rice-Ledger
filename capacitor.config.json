@@ -1,0 +1,6 @@
+{
+  "appId": "com.eggrice.ledger",
+  "appName": "Egg & Rice Ledger",
+  "webDir": "www",
+  "android": { "backgroundColor": "#f2f5f1" }
+}
